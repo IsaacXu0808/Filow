@@ -20,7 +20,7 @@ Before running this application, make sure you have the following installed:
 
 1. Clone the repository
 ```bash
-git clone [[repository-url]](https://github.com/IsaacXu0808/Filow)
+git clone https://github.com/IsaacXu0808/Filow
 ```
 
 2. Install dependencies for both frontend and backend

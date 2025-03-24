@@ -20,7 +20,7 @@
 
 1. 克隆仓库
 ```bash
-git clone [[仓库地址]](https://github.com/IsaacXu0808/Filow)
+git clone https://github.com/IsaacXu0808/Filow
 ```
 
 2. 安装前后端依赖
