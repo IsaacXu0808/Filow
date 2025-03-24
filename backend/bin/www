@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('backend:server');
+var http = require('http');
+var io = require('socket.io');
+const { vCodeToSocketId, socketIdToVCode, vCodeToReceiverSocketId, receiverSocketIdToVCode, fileInfo } = require('../sharedData');
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port, () => {
+  console.log('Server is running on port ' + port);
+});
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
+
+var ioServer = io(server, {
+  cors: {
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+  }
+});
+
+// 存储文件块的对象
+const fileChunks = {};
+
+ioServer.on('connection', (socket) => {
+  console.log('A client connected');
+
+  socket.on('sender_join', (vCode) => {
+    console.log('Received vCode from client:', vCode);
+    vCodeToSocketId[vCode] = socket.id;
+    socketIdToVCode[socket.id] = vCode;
+  });
+
+  socket.on('receiver_join', (vCode) => {
+    console.log('Receiver attempting to join with vCode:', vCode);
+    if (vCodeToSocketId[vCode]) {
+      console.log('vCode exists, receiver can join:', vCode);
+      vCodeToReceiverSocketId[vCode] = socket.id;
+      receiverSocketIdToVCode[socket.id] = vCode;
+
+      // Broadcast success message to both sender and receiver
+      const senderSocketId = vCodeToSocketId[vCode];
+      const receiverSocketId = socket.id;
+
+      ioServer.to(senderSocketId).emit('match_success', { message: 'Match successful with receiver' });
+      ioServer.to(receiverSocketId).emit('match_success', { message: 'Match successful with sender' });
+      socket.emit('join_status', { status: 200, message: 'Receiver joined successfully' });
+    } else {
+      console.log('vCode does not exist, receiver cannot join:', vCode);
+      socket.emit('join_status', { status: 400, message: 'vCode does not exist' });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+    const vCode = socketIdToVCode[socket.id] || receiverSocketIdToVCode[socket.id];
+    if (vCode) {
+      delete vCodeToSocketId[vCode];
+      delete socketIdToVCode[socket.id];
+      delete vCodeToReceiverSocketId[vCode];
+      delete receiverSocketIdToVCode[socket.id];
+    }
+  });
+
+  socket.on('file_info', (data) => {
+    const vCode = socketIdToVCode[socket.id];
+    console.log('File info received from sender');
+    const receiverSocketId = vCodeToReceiverSocketId[vCode];
+    fileChunks[vCode] = [];
+    fileInfo[vCode] = data;
+    ioServer.to(receiverSocketId).emit('file_info', data);
+  });
+
+  socket.on('file_chunk', (data) => {
+    const { chunk, currentChunk } = data;
+    const vCode = socketIdToVCode[socket.id];
+    
+    if (!fileChunks[vCode]) {
+      fileChunks[vCode] = [];
+    }
+    
+    fileChunks[vCode][currentChunk] = chunk;
+    console.log('File chunk received from sender');
+    ioServer.to(vCodeToReceiverSocketId[vCode]).emit('file_chunk_received');
+    // Logic to store the chunk on the server
+    if (fileChunks[vCode].length === data.totalChunks) {
+      console.log('All chunks received for file');
+      // Combine all chunks into a single 
+    }
+  });
+
+  socket.on('request_download', async (data) => {
+    try {
+      const { vCode } = data;
+      
+      // 获取该 vCode 对应的所有文件块
+      const chunks = fileChunks[vCode];
+      
+      if (!chunks) {
+        socket.emit('download_error', { message: 'File not found' });
+        return;
+      }
+
+      // 将所有块合并成一个 Buffer
+      const fileBuffer = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)));
+
+      // 发送文件数据给客户端
+      socket.emit('file_ready', { fileData: fileBuffer });
+
+      // 可选：清理服务器上的文件块
+      delete fileChunks[vCode];
+    } catch (error) {
+      socket.emit('download_error', { message: error.message });
+    }
+  });
+});
