@@ -1,185 +1,143 @@
 # AI 使用报告
 
-## AI 工具选型
+## 1. AI 工具选型
 
-### 1. Claude (Anthropic)
-优点：
-- 代码理解和生成能力强
-- 上下文理解准确
-- 可以处理复杂的技术问题
-- 响应更加详细和结构化
-- 支持多语言切换
+### 1.1 ChatGPT 4o Web App
+**优点**：
+- 对问题的理解和解释比较细致，思考问题更全面。
+- 生成的技术方案有充分的说明，能够一次给出多个可能的解决方案。
 
-缺点：
-- 访问受限，需要通过特定平台
-- 有时响应较慢
-- 无法直接访问最新信息
+**缺点**：
+- 生成的代码较为碎片化，使用仍需要很多调整。
+- 无法阅读整个项目的代码，需要手动附加且数量有限。
+- 无法直接在源代码上应用改动，导致开发者需要手动整合。
 
-### 2. ChatGPT (OpenAI)
-优点：
-- 使用广泛，易于访问
-- 响应速度快
-- 支持多种编程语言
-- API 集成方便
+### 1.2 Cursor
+**优点**：
+- 可以阅读整个项目，生成回答时会参考整体的业务逻辑和代码上下文，同时参考和修改多个文件。
+- 可以直接在源代码上应用改动，支持大量生成源文件和代码。
 
-缺点：
-- 代码准确性有时不够理想
-- 上下文管理能力较弱
-- 回答可能过于简化
+**缺点**：
+- 会重复生成已经被开发者弃用的解决方案，增加工作量。
+- 有时生成的代码对部分技术细节把握不精准，如报错的原因、变量的作用域、组件的样式。
 
-### 3. GitHub Copilot
-优点：
-- 实时代码补全
-- IDE 集成
-- 上下文感知强
-- 适合小规模代码生成
+## 2. 使用过程
 
-缺点：
-- 订阅费用较高
-- 有时建议不够准确
-- 依赖现有代码库质量
+### 2.1 过程简述
 
-## AI 工具使用过程
+#### 2.1.1 ChatGPT 4o Web App
+在开发过程中，ChatGPT 4o 主要用于解决一般性的技术问题和生成素材。它帮助解决了跨域传输的配置问题，生成应用的 logo，以及回答通用技术问题如 Vue.js 和 Express.js 的项目初始化，解释 WebSocket 的工作流程等。
 
-在本项目开发中，主要使用了 Claude 作为主要的 AI 辅助工具。以下是具体的应用场景：
+#### 2.1.2 Cursor
+Cursor 被广泛用于快速生成和编辑代码，包括源文件、函数、组件、样式和页面路由配置。几乎所有源代码的最初版本都由 Cursor 生成，极大地提高了开发效率。
 
-### 场景一：WebSocket 文件传输实现
+### 2.2 场景和代码示例
 
-**问题描述**：需要实现基于 Socket.IO 的分块文件传输功能。
+#### 2.2.1 Cursor 优点示例
 
-**AI 解决方案**：
-Claude 提供了完整的实现思路和代码示例：
-
-```javascript
-// 发送端代码
-const sendFile = () => {
-  if (selectedFile.value) {
-    const file = selectedFile.value;
-    const chunkSize = 1024 * 1;
-    const totalChunks = Math.ceil(file.size / chunkSize);
-    
-    socket.emit('file_info', { 
-      name: file.name, 
-      size: file.size, 
-      totalChunks: totalChunks 
-    });
-
-    const reader = new FileReader();
-    let currentChunk = 0;
-
-    reader.onload = (e) => {
-      socket.emit('file_chunk', { 
-        chunk: e.target.result, 
-        currentChunk: currentChunk 
-      });
-      currentChunk++;
-    };
-  }
-}
-```
-
-**AI 优势**：
-- 提供了完整的文件分块传输逻辑
-- 考虑了错误处理和进度跟踪
-- 代码结构清晰，易于理解
-
-**局限性**：
-- 需要手动调整部分参数（如块大小）
-- 未考虑所有边缘情况
-
-### 场景二：实时进度显示实现
-
-**问题描述**：需要在接收端实现文件传输进度的实时显示。
-
-**AI 解决方案**：
-Claude 提供了进度条组件的实现：
+**（1）代码生成**
+Cursor 能够快速生成代码并应用改动。例如，在实现 `VerificationCode` 和 `Banner` 组件时，通过描述组件的外观，Cursor 生成了以下代码：
 
 ```vue
 <template>
-  <div v-if="receivedChunks > 0" class="progress-bar">
-    <div 
-      class="progress" 
-      :style="{ width: 100 * receivedChunks / totalChunks + '%' }"
-    >
-      {{ (100 * receivedChunks / totalChunks).toFixed(2) }}%
-    </div>
+  <div class="verification-code">
+    <input type="text" v-model="code" maxlength="6" />
   </div>
 </template>
 
 <script setup>
-const receivedChunks = ref(0);
-const totalChunks = ref(1);
+import { ref } from 'vue';
 
-socket.on('file_chunk_received', () => {
-  receivedChunks.value++;
-  if (receivedChunks.value === totalChunks.value) {
-    uploadStatus.value = 'Press the button to download the file';
-  }
-});
+const code = ref('');
 </script>
+
+<style scoped>
+.verification-code {
+  /* 样式定义 */
+}
+</style>
 ```
 
-**AI 优势**：
-- 提供了完整的响应式解决方案
-- 包含了样式和交互逻辑
-- 考虑了用户体验
-
-**局限性**：
-- 样式需要手动调整以适应具体需求
-- 进度计算可能需要优化
-
-### 场景三：文件重建与下载
-
-**问题描述**：需要在接收端将接收到的文件块重新组装并触发下载。
-
-**AI 解决方案**：
-Claude 提供了文件重建和下载的实现：
+**（2）多文件理解和生成**
+Cursor 可以理解项目的整体结构，并在多个文件中进行修改。例如，在实现文件传输的过程中，Cursor 能够一次性生成 `Sender`、`Server`和 `Receiver` 三者的文件信息传输代码：
 
 ```javascript
-socket.on('file_ready', (data) => {
-  // 创建 Blob 对象
-  const blob = new Blob([data.fileData], { 
-    type: 'application/octet-stream' 
-  });
-  
-  // 创建下载链接
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName.value;
-  
-  // 触发下载
-  document.body.appendChild(a);
-  a.click();
-  
-  // 清理
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+// Sender 发送文件信息
+socket.emit('file_info', { name: file.name, size: file.size, totalChunks: totalChunks });
+
+// Server 处理文件信息
+socket.on('file_info', (data) => {
+  // 处理逻辑
+  const vCode = socketIdToVCode[socket.id];
+  console.log('File info received from sender');
+  const receiverSocketId = vCodeToReceiverSocketId[vCode];
+  fileChunks[vCode] = [];
+  fileInfo[vCode] = data;
+  ioServer.to(receiverSocketId).emit('file_info', data);
+});
+
+// Receiver 接收文件信息
+socket.on('file_info', (data) => {
+  fileName.value = data.name;
+  totalChunks.value = data.totalChunks;
 });
 ```
 
-**AI 优势**：
-- 提供了完整的文件处理流程
-- 包含了必要的清理操作
-- 考虑了浏览器兼容性
+#### 2.2.2 Cursor 缺点示例
 
-**局限性**：
-- 大文件处理可能需要额外优化
-- 未处理所有可能的文件类型
+**（1）无法实现视觉方案**
+Cursor 在处理视觉方案时存在局限性。例如，在实现一个错误提示语在不显示时也占据页面高度时，Cursor 提供的样式未能完全解决问题，最终需要手动调整。
+
+Cursor生成的代码：
+```html
+<p v-show="showError"class="error-message">{{ errorMessage }}</p>
+```
+```css
+.error-message {
+  height: 20px;
+  min-height: 20px;
+}
+```
+
+template部分手动处理后：
+```html
+<div class="error-message">
+  <p v-show="showError">{{ errorMessage }}</p>
+</div>
+```
+
+**（2）重复出现已经弃用的方案**
+在某些情况下，Cursor 会重复生成已经被开发者弃用的解决方案。例如，在 `ReceiverCode.vue` 页面挂载时建立 WebSocket 连接的逻辑，尽管开发者已将其改为按按钮建立连接，Cursor 仍然在后续的自动代码编辑中**多次**将其改回挂载时建立连接，。
+
+```javascript
+// 错误的连接方式：挂载时连接
+onMounted(() => {
+  socket = io('http://localhost:3000');
+});
+
+```
+```javascript
+// 正确方式：确认验证码正确后再连接
+fetch('http://localhost:3000/api/receiver_join', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ vCode: vCode.value }),
+})
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('vCode does not exist');
+    }
+    return response.json();
+  })
+  .then(data => {
+    console.log('API response:', data);
+    socket = io('http://localhost:3000');
+    // 后续逻辑
+  })
+```
+
 
 ## 总结
-
-AI 工具在本项目开发中发挥了重要作用：
-1. 加快了开发速度
-2. 提供了完整的技术方案
-3. 帮助解决了复杂的技术问题
-
-但同时也存在一些局限：
-1. 有时需要人工调整和优化
-2. 可能忽略特定场景的边缘情况
-3. 代码质量依赖于提问的质量
-
-建议：
-1. 在使用 AI 工具时，需要对生成的代码进行审查和测试
-2. 结合实际场景对 AI 建议进行适当调整
-3. 保持与 AI 的持续对话，以获得更好的解决方案 
+AI 工具在本项目开发中发挥了重要作用，帮助解决了多个技术问题，提高了开发效率。但是，开发者仍需对生成的代码进行审查和调整，以确保其符合项目需求。这意味着开发者仍需要充足的专业知识来支持项目的完成，AI工具暂时不具备端到端的完成工程代码的准确性和鲁棒性。然而，在AI辅助开发日渐盛行的背景下，学习者和开发者实践的机会被AI工具压缩，开发过程中必要的知识和经验储备是否足够与AI互补，是值得探讨的问题。
